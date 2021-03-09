@@ -10,7 +10,7 @@ from torch.utils.data import random_split
 import os
 
 epochs = 20
-batch_size = 50
+batch_size = 256
 start_time = None
 
 def get_model_size(model):
