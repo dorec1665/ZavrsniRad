@@ -84,8 +84,6 @@ model = model.resnet18()
 model.to(device)
 model.train()
 
-size = get_model_size(model)
-
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
 
@@ -119,5 +117,5 @@ for epoch in range(epochs):
 
 end_timer("Base: ")
 evaluate("Test: ", test_loader, model, criterion)
-print("Model size: {}".format(size))
+print("Model size: {}".format(get_model_size(model)) + "MB")
 
