@@ -8,10 +8,20 @@ import gc
 import model
 from torch.utils.data import random_split
 import os
+import subprocess
 
 epochs = 20
 batch_size = 256
 start_time = None
+
+
+def get_gpu_memory_map():
+    result = subprocess.check_output(
+        [
+            'nvidia-smi', '--query-gpu=memory.used',
+            '--format=csv,nounits,noheader'
+        ])
+    return int(result)
 
 def get_model_size(model):
     torch.save(model.state_dict(), 'my_model_amp.pt')
@@ -32,7 +42,7 @@ def end_timer(message):
     end_time = time.time()
     print("\n" + message)
     print("Total execution time = {:.3f} sec".format(end_time - start_time))
-    print("Max memory used by tensors = {} bytes".format(torch.cuda.max_memory_allocated()))
+    print("Max memory used by tensors = {} MB".format(torch.cuda.max_memory_allocated()/(1024*1024)))
 
 def evaluate(name, eval_data, eval_model, eval_loss):
     with torch.no_grad():
@@ -56,6 +66,7 @@ def evaluate(name, eval_data, eval_model, eval_loss):
 
         print(name + "accuracy = %.2f" % accuracy)
         print(name + "avg loss = %.2f" % avg_loss)
+
 
 
 DATA_DIR = Path(__file__).parent / 'dataset' / 'CIFAR10'
@@ -95,6 +106,7 @@ n_batch = len(train_data) // batch_size
 
 scaler = torch.cuda.amp.GradScaler()
 
+
 start_timer()
 for epoch in range(epochs):
     for batch_idx, batch_data in enumerate(train_loader):
@@ -105,7 +117,9 @@ for epoch in range(epochs):
 
         with torch.cuda.amp.autocast():
             outputs = model(inputs)
+            assert outputs.dtype is torch.float16
             loss = criterion(outputs, labels)
+            assert loss.dtype is torch.float32
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -115,11 +129,11 @@ for epoch in range(epochs):
             print("epoch: {}, step: {}/{}, batch_loss: {}"
                   .format(epoch, batch_idx, n_batch, loss.item()))
 
-    evaluate("Train: ", train_loader, model, criterion)
-    evaluate("Validation: ", val_loader, model, criterion)
+
     scheduler.step()
+    print(f"GPU Memory Used: {get_gpu_memory_map()} MB")
 
 end_timer("Amp: ")
 evaluate("Test: ", test_loader, model, criterion)
-print("Model size: {}".format(get_model_size(model)) + "MB")
+
 
